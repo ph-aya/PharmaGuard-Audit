@@ -15,8 +15,17 @@ st.title("🛡️ PharmaGuard: EU Compliance Auditor")
 st.caption("Auto-synced with EU CosIng Annex II Database via GitHub Pipeline")
 
 # ---------------------------------------------------------
-# 2. Data Engine (Auto-Sync)
+# 2. Data Engine & Safe List
 # ---------------------------------------------------------
+# 🔥 قائمة الحصانة: مواد آمنة جداً ومشهورة، نمنع السيستم من حظرها بالخطأ
+SAFE_LIST = [
+    "aqua", "water", "eau", "glycerin", "panthenol", "citric acid", 
+    "phenoxyethanol", "tocopherol", "sodium benzoate", "potassium sorbate",
+    "stearic acid", "cetearyl alcohol", "cetyl alcohol", "dimethicone",
+    "parfum", "fragrance", "sodium hydroxide", "limonene", "linalool",
+    "xanthan gum", "carbomer", "disodium edta"
+]
+
 @st.cache_data(ttl=1800)
 def load_data():
     url = "https://raw.githubusercontent.com/ph-aya/PharmaGuard-Audit/main/banned.csv"
@@ -24,12 +33,9 @@ def load_data():
         df = pd.read_csv(url, on_bad_lines='skip', engine='python')
         df = df.rename(columns={
             'Chemical name / INN': 'inci_name',
-            'CAS Number': 'cas_no',
-            'EC Number': 'ec_number',
-            'Reference Number': 'ref_no'
+            'CAS Number': 'cas_no'
         })
         
-        # Cleaning: Lowercase everything for comparison
         if 'inci_name' in df.columns:
             df['inci_name'] = df['inci_name'].astype(str).str.lower().str.strip()
         
@@ -47,13 +53,12 @@ with st.spinner('Syncing with EU Server...'):
 if df.empty:
     st.stop()
 else:
-    # We keep the raw list for fuzzy matching
     banned_names = df['inci_name'].tolist()
     banned_cas = df['cas_no'].tolist()
     st.toast(f"✅ System Ready! Loaded {len(df)} substances.", icon="🟢")
 
 # ---------------------------------------------------------
-# 3. Intelligent Scan Logic
+# 3. Intelligent Scan Logic (With Safety Filter)
 # ---------------------------------------------------------
 col1, col2 = st.columns([2, 1])
 
@@ -62,41 +67,48 @@ with col1:
     user_input = st.text_area(
         "Paste Ingredient List:", 
         height=200, 
-        placeholder="e.g. Aqua, Isopropylparaben, Lilial, 80-54-6..."
+        placeholder="e.g. Aqua, Glycerin, Isopropylparaben, 80-54-6..."
     )
     
-    if st.button("🚀 Run Deep Scan", type="primary"):
+    if st.button("🚀 Run Smart Scan", type="primary"):
         if user_input:
             risks = []
-            ingredients = [x.strip().lower() for x in user_input.replace('\n', ',').split(',')]
+            # Split by comma OR newline to handle different formats
+            raw_text = user_input.replace('\n', ',')
+            ingredients = [x.strip().lower() for x in raw_text.split(',')]
             
             for item in ingredients:
                 if len(item) < 3: continue 
                 
-                # --- LEVEL 1: CAS Number Scan (High Precision) ---
+                # ✅ STEP 0: Check Safe List (Immunity)
+                # اذا المادة موجودة بقائمة الحصانة، نعبرها فوراً
+                if item in SAFE_LIST:
+                    continue
+
+                # ❌ STEP 1: CAS Number Scan
                 if item in banned_cas:
                     risks.append(f"❌ **BANNED (CAS Match):** Code **'{item}'** is a prohibited substance.")
                     continue
 
-                # --- LEVEL 2: Exact Name Match ---
+                # ❌ STEP 2: Exact Name Match
                 if item in banned_names:
                     risks.append(f"❌ **BANNED (Direct Match):** The substance **'{item}'** is explicitly listed.")
                     continue
 
-                # --- LEVEL 3: Deep Substring Scan (New Feature) 🔥 ---
-                # يبحث إذا كانت الكلمة المدخلة جزءاً من اسم طويل في القائمة
-                # Example: Finds "Isopropylparaben" inside "Salts of Isopropylparaben"
+                # ⚠️ STEP 3: Deep Substring Scan (The Hunter)
+                # يبحث عن السم المدسوس، لكن يتجاهل الكلمات القصيرة لتجنب الاخطاء
                 substring_match = False
                 for banned in banned_names:
-                    # شرط الطول لتجنب الأخطاء (مثلا البحث عن tea لا يمسك tears)
-                    if len(item) > 4 and item in banned:
-                        risks.append(f"⚠️ **BANNED (Hidden Match):** **'{item}'** was found inside the prohibited entry: *'{banned[:50]}...'*")
+                    # شرط: المادة المحظورة يجب ان تكون اطول من 6 حروف
+                    # والكلمة المدخلة يجب ان تكون اطول من 5 حروف
+                    if len(item) > 5 and len(banned) > 6 and item in banned:
+                        risks.append(f"⚠️ **BANNED (Hidden Match):** **'{item}'** was found inside: *'{banned[:50]}...'*")
                         substring_match = True
-                        break # Stop searching for this item if found
+                        break 
                 
                 if substring_match: continue
 
-                # --- LEVEL 4: Fuzzy Logic (Typo Detection) ---
+                # ❓ STEP 4: Fuzzy Logic (Typo Detection)
                 matches = get_close_matches(item, banned_names, n=1, cutoff=0.85)
                 if matches:
                     risks.append(f"❓ **SUSPICIOUS (Typo?):** Did you mean **'{matches[0][:30]}...'**? It is BANNED.")
@@ -108,20 +120,20 @@ with col1:
                 for r in risks: st.markdown(r)
             else:
                 st.success("✅ AUDIT PASSED: No banned substances found.")
-                st.caption("Checked against EU Annex II (Official GitHub Mirror).")
+                st.info("Note: Common safe ingredients (Aqua, Glycerin, etc.) are auto-approved.")
         else:
             st.warning("Enter ingredients to start.")
 
 with col2:
-    st.info("📊 **Database Stats**")
+    st.info("📊 **System Stats**")
     st.metric(label="Banned Substances", value=len(df))
-    st.write("**Scan Mode:** Deep Search (Substring + Fuzzy)")
-    st.write("**Status:** Online 🟢")
+    st.metric(label="Safe List Items", value=len(SAFE_LIST))
+    st.write("**Mode:** Smart Filter Enabled 🧠")
     st.markdown("---")
-    with st.expander("ℹ️ How Deep Scan Works"):
+    with st.expander("ℹ️ Logic Explanation"):
         st.write("""
-        1. **CAS Check:** Checks chemical ID numbers.
-        2. **Exact Match:** Direct name comparison.
-        3. **Hidden Match:** Finds ingredients hidden inside long chemical descriptions (e.g. finding 'Paraben' inside 'Salts of Paraben').
-        4. **Typo Detector:** Catches spelling mistakes.
+        1. **Safe List:** Skips common safe items (Water, Glycerin).
+        2. **CAS Check:** Checks ID numbers.
+        3. **Hidden Match:** Finds banned items hidden in text.
+        4. **Typo Detector:** Catches misspellings.
         """)
