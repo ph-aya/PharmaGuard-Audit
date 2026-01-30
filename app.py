@@ -18,7 +18,7 @@ st.caption("Auto-synced with EU CosIng Annex II Database via GitHub Pipeline")
 # 2. Data Engine & Lists
 # ---------------------------------------------------------
 
-# ✅ قائمة الحصانة النهائية (تم تحديثها لتشمل الأمونيا والريزورسينول)
+# ✅ قائمة الحصانة النهائية
 SAFE_LIST = [
     "aqua", "water", "eau", "glycerin", "panthenol", "citric acid", 
     "phenoxyethanol", "tocopherol", "sodium benzoate", "potassium sorbate",
@@ -32,7 +32,7 @@ SAFE_LIST = [
     "hydrogen peroxide"
 ]
 
-# ☠️ قاموس الأسماء المستعارة (المواد الخطرة بأسماء شائعة)
+# ☠️ قاموس الأسماء المستعارة
 DANGEROUS_ALIASES = {
     "methyl alcohol": "Methanol (Toxic/Banned)",
     "wood alcohol": "Methanol (Toxic/Banned)",
@@ -99,38 +99,35 @@ with col1:
             for item in ingredients:
                 if len(item) < 3: continue 
                 
-                # ✅ STEP 0: Check Safe List
-                if item in SAFE_LIST:
-                    continue
+                # STEP 0: Check Safe List
+                if item in SAFE_LIST: continue
 
-                # ☠️ STEP 1: Check Aliases
+                # STEP 1: Check Aliases
                 if item in DANGEROUS_ALIASES:
                     real_name = DANGEROUS_ALIASES[item]
                     risks.append(f"❌ **BANNED (Alias Match):** **'{item}'** is a known alias for **{real_name}**.")
                     continue
 
-                # ❌ STEP 2: CAS Number Scan
+                # STEP 2: CAS Number Scan
                 if item in banned_cas:
                     risks.append(f"❌ **BANNED (CAS Match):** Code **'{item}'** is a prohibited substance.")
                     continue
 
-                # ❌ STEP 3: Exact Name Match
+                # STEP 3: Exact Name Match
                 if item in banned_names:
                     risks.append(f"❌ **BANNED (Direct Match):** The substance **'{item}'** is explicitly listed.")
                     continue
 
-                # ⚠️ STEP 4: Deep Substring Scan
+                # STEP 4: Deep Substring Scan
                 substring_match = False
                 for banned in banned_names:
-                    # شرط دقيق: الكلمة لازم تكون أطول من 5 والكلمة المحظورة أطول من 6
                     if len(item) > 5 and len(banned) > 6 and item in banned:
                         risks.append(f"⚠️ **BANNED (Hidden Match):** **'{item}'** was found inside: *'{banned[:50]}...'*")
                         substring_match = True
                         break 
-                
                 if substring_match: continue
 
-                # ❓ STEP 5: Fuzzy Logic
+                # STEP 5: Fuzzy Logic
                 matches = get_close_matches(item, banned_names, n=1, cutoff=0.85)
                 if matches:
                     risks.append(f"❓ **SUSPICIOUS (Typo?):** Did you mean **'{matches[0][:30]}...'**? It is BANNED.")
@@ -150,12 +147,26 @@ with col2:
     st.info("📊 **System Stats**")
     st.metric(label="Banned Substances", value=len(df))
     st.metric(label="Known Aliases", value=len(DANGEROUS_ALIASES))
-    st.write("**Mode:** Production V6.1 🏆")
+    st.write("**Mode:** Production V6.2 🏆")
     st.markdown("---")
     with st.expander("ℹ️ Logic Explanation"):
         st.write("""
-        1. **Safe List:** Skips approved items (e.g. Aqua, Ammonia).
+        1. **Safe List:** Skips approved items.
         2. **Alias Check:** Detects common names (e.g. Formalin).
         3. **CAS Check:** Checks ID numbers.
         4. **Hidden Match:** Finds banned items hidden in text.
         """)
+
+# ---------------------------------------------------------
+# 4. Footer & Credits ✍️
+# ---------------------------------------------------------
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align: center; color: #666;'>
+        <h4>Developed by Ph. Aya Omar 👩‍🔬</h4>
+        <p>Powered by PharmaGuard Engine | © 2026</p>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
