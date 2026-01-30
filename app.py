@@ -15,15 +15,18 @@ st.title("🛡️ PharmaGuard: EU Compliance Auditor")
 st.caption("Auto-synced with EU CosIng Annex II Database via GitHub Pipeline")
 
 # ---------------------------------------------------------
-# 2. Data Engine & Safe List
+# 2. Data Engine & Extended Safe List
 # ---------------------------------------------------------
-# 🔥 قائمة الحصانة: مواد آمنة جداً ومشهورة، نمنع السيستم من حظرها بالخطأ
+# 🔥 قائمة الحصانة الموسعة (V5.1) - لمنع حظر المواد الأساسية
 SAFE_LIST = [
     "aqua", "water", "eau", "glycerin", "panthenol", "citric acid", 
     "phenoxyethanol", "tocopherol", "sodium benzoate", "potassium sorbate",
     "stearic acid", "cetearyl alcohol", "cetyl alcohol", "dimethicone",
     "parfum", "fragrance", "sodium hydroxide", "limonene", "linalool",
-    "xanthan gum", "carbomer", "disodium edta"
+    "xanthan gum", "carbomer", "disodium edta", 
+    "alcohol", "alcohol denat", "ethanol", "propylene glycol", 
+    "paraffinum liquidum", "mineral oil", "petrolatum", "kaolin", 
+    "mica", "talc", "silica", "ci 77891", "titanium dioxide"
 ]
 
 @st.cache_data(ttl=1800)
@@ -73,7 +76,7 @@ with col1:
     if st.button("🚀 Run Smart Scan", type="primary"):
         if user_input:
             risks = []
-            # Split by comma OR newline to handle different formats
+            # معالجة النصوص: تقسيم بالفواصل أو الأسطر الجديدة
             raw_text = user_input.replace('\n', ',')
             ingredients = [x.strip().lower() for x in raw_text.split(',')]
             
@@ -81,7 +84,6 @@ with col1:
                 if len(item) < 3: continue 
                 
                 # ✅ STEP 0: Check Safe List (Immunity)
-                # اذا المادة موجودة بقائمة الحصانة، نعبرها فوراً
                 if item in SAFE_LIST:
                     continue
 
@@ -96,11 +98,10 @@ with col1:
                     continue
 
                 # ⚠️ STEP 3: Deep Substring Scan (The Hunter)
-                # يبحث عن السم المدسوس، لكن يتجاهل الكلمات القصيرة لتجنب الاخطاء
+                # تم رفع شرط الطول لتقليل الاخطاء
                 substring_match = False
                 for banned in banned_names:
-                    # شرط: المادة المحظورة يجب ان تكون اطول من 6 حروف
-                    # والكلمة المدخلة يجب ان تكون اطول من 5 حروف
+                    # يجب أن تكون الكلمة المدخلة أطول من 5 أحرف لتفعيل البحث العميق
                     if len(item) > 5 and len(banned) > 6 and item in banned:
                         risks.append(f"⚠️ **BANNED (Hidden Match):** **'{item}'** was found inside: *'{banned[:50]}...'*")
                         substring_match = True
@@ -120,7 +121,7 @@ with col1:
                 for r in risks: st.markdown(r)
             else:
                 st.success("✅ AUDIT PASSED: No banned substances found.")
-                st.info("Note: Common safe ingredients (Aqua, Glycerin, etc.) are auto-approved.")
+                st.info("Note: Common safe ingredients (Aqua, Alcohol, Glycerin) are auto-approved.")
         else:
             st.warning("Enter ingredients to start.")
 
@@ -128,11 +129,11 @@ with col2:
     st.info("📊 **System Stats**")
     st.metric(label="Banned Substances", value=len(df))
     st.metric(label="Safe List Items", value=len(SAFE_LIST))
-    st.write("**Mode:** Smart Filter Enabled 🧠")
+    st.write("**Mode:** Smart Filter V5.1 🧠")
     st.markdown("---")
     with st.expander("ℹ️ Logic Explanation"):
         st.write("""
-        1. **Safe List:** Skips common safe items (Water, Glycerin).
+        1. **Safe List:** Skips common safe items (Water, Alcohol, Glycerin).
         2. **CAS Check:** Checks ID numbers.
         3. **Hidden Match:** Finds banned items hidden in text.
         4. **Typo Detector:** Catches misspellings.
