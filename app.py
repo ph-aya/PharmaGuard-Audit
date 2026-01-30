@@ -5,122 +5,138 @@ from io import StringIO
 from difflib import get_close_matches
 
 # ---------------------------------------------------------
-# 1. System Config
+# 1. System Configuration
 # ---------------------------------------------------------
-st.set_page_config(page_title="PharmaGuard Auto-Sync", layout="wide", page_icon="📡")
-st.title("📡 PharmaGuard: Autonomous Regulatory Auditor")
-st.caption("System Status: Auto-Fetching from Global Repositories...")
+st.set_page_config(
+    page_title="PharmaGuard Audit", 
+    layout="wide", 
+    page_icon="🛡️"
+)
+
+st.title("🛡️ PharmaGuard: Live Compliance Auditor")
 
 # ---------------------------------------------------------
-# 2. The "Hunter" Engine (Auto-Fetch Logic)
+# 2. The "Tank" Engine (Robust Data Loader)
 # ---------------------------------------------------------
-@st.cache_data(ttl=3600)  # يحدث البيانات كل ساعة تلقائياً
-def fetch_live_data():
-    # قائمة الأهداف: روابط مباشرة للداتا (اذا واحد مات، الثاني يشتغل)
-    targets = [
-        # الرابط الأكثر استقراراً (Dataset Mirror)
+@st.cache_data(ttl=3600)
+def load_data():
+    # محاولة 1: روابط محدثة (جربنا مسارات مختلفة لضمان الوصول)
+    possible_urls = [
         "https://raw.githubusercontent.com/openfoodfacts/openbeautyfacts/main/cosing/csv/COSING_Annex_II_v2.csv",
-        # المصدر الثاني (Backup Branch)
         "https://raw.githubusercontent.com/openfoodfacts/openbeautyfacts/master/cosing/csv/COSING_Annex_II_v2.csv",
-        # المصدر الثالث (Old Structure)
-        "https://raw.githubusercontent.com/openfoodfacts/openbeautyfacts/main/cosing/COSING_Annex_II_v2.csv",
-        # المصدر الرابع (Raw Data Backup)
-        "https://raw.githubusercontent.com/datasets/cosmetics/master/data/cosmetics.csv"
+        "https://raw.githubusercontent.com/openfoodfacts/openbeautyfacts/main/cosing/COSING_Annex_II_v2.csv"
     ]
     
-    # التمويه (حتى السيرفر عباله احنا متصفح مو كود)
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"}
     
-    for url in targets:
+    for url in possible_urls:
         try:
-            # محاولة الاتصال
-            response = requests.get(url, headers=headers, timeout=10)
-            
+            response = requests.get(url, headers=headers, timeout=5)
             if response.status_code == 200:
-                # قراءة الملف
-                csv_data = StringIO(response.text)
-                df = pd.read_csv(csv_data, on_bad_lines='skip')
-                
-                # تنظيف أسماء الأعمدة (Normalization)
+                # إذا نجح الاتصال، نحول النص إلى داتا ونطلع
+                df = pd.read_csv(StringIO(response.text), on_bad_lines='skip')
+                # تنظيف أسماء الأعمدة لضمان التطابق
                 df.columns = [c.strip().lower() for c in df.columns]
-                
-                # التأكد من أن الملف يحتوي على داتا حقيقية مو فارغ
-                if len(df) > 100:
-                    return df, f"Successfully Synced with: {url.split('/')[2]} Repo"
-                    
-        except Exception as e:
-            continue # فشل هذا الرابط؟ طز، جرب اللي بعده
+                return df, "Live Cloud Database"
+        except Exception:
+            continue # فشل الرابط؟ نعبر عالبعده
             
-    return None, "All Targets Failed"
+    # محاولة 2: وضع الطوارئ (Emergency Backup)
+    # في حال كل الروابط فشلت، نستخدم داتا مخزونة هنا
+    emergency_csv = """Reference number,Chemical name / INN,CAS Number
+    1183,Hydroquinone,123-31-9
+    1370,Clobetasol propionate,25122-46-7
+    386,Mercury,7439-97-6
+    4a,Tretinoin (Retinoic acid),302-79-4
+    12,Betamethasone,378-44-9
+    3,Corticosteroids (Glucocorticoids),
+    1120,Chloroform,67-66-3
+    198,Phenol,108-95-2
+    """
+    df = pd.read_csv(StringIO(emergency_csv))
+    df.columns = [c.strip().lower() for c in df.columns]
+    return df, "Internal Backup (Offline Mode)"
 
-# ---------------------------------------------------------
-# 3. Execution & Interface
-# ---------------------------------------------------------
-with st.spinner('📡 Connecting to EU Data Nodes...'):
-    df, status_msg = fetch_live_data()
-
-if df is not None:
-    # الذكاء في تحديد الأعمدة (Smart Column Detection)
-    # يدور على العمود اللي بي كلمة name أو inn
-    name_col = next((c for c in df.columns if 'name' in c or 'inn' in c), None)
-    # يدور على العمود اللي بي كلمة cas
-    cas_col = next((c for c in df.columns if 'cas' in c), None)
+# تحميل البيانات وتشغيل المحرك
+with st.spinner('Syncing Regulatory Data...'):
+    df, source_status = load_data()
     
-    if name_col:
-        # تحضير قوائم البحث
-        banned_names = df[name_col].dropna().astype(str).str.lower().tolist()
-        banned_cas = df[cas_col].dropna().astype(str).tolist() if cas_col else []
-        
-        # واجهة النجاح
-        st.success(f"✅ **Online & Ready** | {status_msg}")
-        st.metric("Active Prohibitions Monitored", f"{len(banned_names):,}")
-        
-        # --- منطقة الفحص ---
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            user_input = st.text_area("Paste Ingredients Here:", height=200, placeholder="Aqua, Glycerin, Hydroquinone...")
-            
-            if st.button("🚀 Audit Now"):
-                if user_input:
-                    risks = []
-                    ingredients = [x.strip().lower() for x in user_input.replace('\n', ',').split(',')]
-                    
-                    for item in ingredients:
-                        if len(item) < 2: continue
-                        
-                        # 1. Exact Match
-                        if item in banned_names:
-                            risks.append(f"❌ **BANNED:** {item}")
-                        
-                        # 2. CAS Match
-                        elif item in banned_cas:
-                            risks.append(f"❌ **BANNED ID (CAS):** {item}")
-                        
-                        # 3. Fuzzy Logic (AI)
-                        else:
-                            matches = get_close_matches(item, banned_names, n=1, cutoff=0.85)
-                            if matches:
-                                risks.append(f"⚠️ **Typo Detected:** Did you mean '{matches[0]}'? It is BANNED.")
-                    
-                    if risks:
-                        st.error(f"Found {len(risks)} Violations!")
-                        for r in risks: st.write(r)
-                    else:
-                        st.success("✅ PASSED: No banned substances found in live database.")
-                else:
-                    st.warning("Input is empty.")
-                    
-        with col2:
-            st.info("ℹ️ **System Info**")
-            st.write("This tool autonomously fetches the latest 'Annex II' regulations from open-source mirrors of the EU Commission data.")
-            st.write(f"**Update Interval:** Hourly")
-
+    # عرض الحالة خارج الدالة لتجنب الخطأ
+    if "Backup" in source_status:
+        st.toast("⚠️ Network Error. Using Internal Backup.", icon="🟠")
     else:
-        st.error("🚨 Data Structure Error: Could not identify 'Name' column in the fetched file.")
+        st.toast(f"✅ Live Data Connected", icon="🟢")
+        
+    st.markdown(f"**Status:** 🟢 System Online | **Source:** {source_status}")
+
+# ---------------------------------------------------------
+# 3. Data Processing & Search Logic
+# ---------------------------------------------------------
+# تحديد الأعمدة الصحيحة أوتوماتيكياً
+name_col = next((c for c in df.columns if 'name' in c or 'inn' in c), None)
+cas_col = next((c for c in df.columns if 'cas' in c), None)
+
+if name_col:
+    # تحويل الداتا لقوائم للبحث السريع
+    banned_names = df[name_col].dropna().astype(str).str.lower().tolist()
+    banned_cas = df[cas_col].dropna().astype(str).tolist() if cas_col else []
+
+    # ---------------------------------------------------------
+    # 4. User Interface
+    # ---------------------------------------------------------
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        user_input = st.text_area("Paste Ingredient List (Comma Separated):", height=200, 
+                                placeholder="Example: Aqua, Glycerin, Hydroquinone, 123-31-9...")
+        
+        if st.button("🚀 Run Compliance Audit", type="primary"):
+            if user_input:
+                risks = []
+                # تنظيف المدخلات
+                ingredients = [x.strip().lower() for x in user_input.replace('\n', ',').split(',')]
+                
+                for item in ingredients:
+                    if len(item) < 2: continue
+                    
+                    # 1. تطابق تام بالاسم
+                    if item in banned_names:
+                        risks.append(f"❌ **CRITICAL:** '{item}' is BANNED (Exact Match).")
+                        continue
+                        
+                    # 2. تطابق برقم CAS
+                    if item in banned_cas:
+                        risks.append(f"❌ **CRITICAL (CAS):** ID '{item}' is a banned substance.")
+                        continue
+
+                    # 3. الذكاء الاصطناعي (تصحيح الأخطاء)
+                    matches = get_close_matches(item, banned_names, n=1, cutoff=0.85)
+                    if matches:
+                        risks.append(f"⚠️ **Typo Detected:** Did you mean '{matches[0]}'? It is BANNED.")
+                
+                # عرض النتائج
+                st.markdown("---")
+                if risks:
+                    st.error(f"🚫 FAILED: Found {len(risks)} compliance violations.")
+                    for r in risks: st.markdown(r)
+                else:
+                    st.success("✅ PASSED: No banned substances found in current database.")
+                    st.caption("Note: Always verify with official EU CosIng documents.")
+            else:
+                st.warning("Please enter data to scan.")
+
+    with col2:
+        st.info("📊 **Audit Stats**")
+        st.write(f"Database Size: {len(banned_names)} substances")
+        st.write("Standards: EU Annex II")
+        st.markdown("---")
+        with st.expander("ℹ️ How it works"):
+            st.write("This tool automatically scans ingredient lists against the EU CosIng Annex II database of prohibited substances. It uses fuzzy logic to detect misspellings.")
+
 else:
-    # هذا الإيرر يطلع بس إذا انقطعت الانترنت عن الكوكب كله
-    st.error("📡 Connection Error: Unable to fetch data from any source.")
-    st.warning("Please check Streamlit Cloud logs.")
+    st.error("🚨 Critical Data Error: Could not parse database columns.")
+    st.stop()
+
+# Footer
+st.markdown("---")
+st.caption("PharmaGuard v2.1 | Engineered for Regulatory Agility")
