@@ -15,9 +15,10 @@ st.title("🛡️ PharmaGuard: EU Compliance Auditor")
 st.caption("Auto-synced with EU CosIng Annex II Database via GitHub Pipeline")
 
 # ---------------------------------------------------------
-# 2. Data Engine & Extended Safe List
+# 2. Data Engine & Lists
 # ---------------------------------------------------------
-# 🔥 قائمة الحصانة الموسعة (V5.1) - لمنع حظر المواد الأساسية
+
+# ✅ قائمة الحصانة (المواد الآمنة)
 SAFE_LIST = [
     "aqua", "water", "eau", "glycerin", "panthenol", "citric acid", 
     "phenoxyethanol", "tocopherol", "sodium benzoate", "potassium sorbate",
@@ -26,8 +27,23 @@ SAFE_LIST = [
     "xanthan gum", "carbomer", "disodium edta", 
     "alcohol", "alcohol denat", "ethanol", "propylene glycol", 
     "paraffinum liquidum", "mineral oil", "petrolatum", "kaolin", 
-    "mica", "talc", "silica", "ci 77891", "titanium dioxide"
+    "mica", "talc", "silica", "ci 77891", "titanium dioxide",
+    "isopropyl alcohol" # كحول التعقيم (مسموح)
 ]
+
+# ☠️ قاموس الأسماء المستعارة (المواد الخطرة بأسماء شائعة)
+DANGEROUS_ALIASES = {
+    "methyl alcohol": "Methanol (Toxic/Banned)",
+    "wood alcohol": "Methanol (Toxic/Banned)",
+    "formalin": "Formaldehyde (Carcinogen)",
+    "lilial": "Butylphenyl Methylpropional (Banned Reprotoxic)",
+    "p-bmhca": "Butylphenyl Methylpropional (Banned Reprotoxic)",
+    "lyral": "Hydroxyisohexyl 3-Cyclohexene Carboxaldehyde",
+    "ppd": "p-Phenylenediamine",
+    "lead": "Heavy Metal (Banned)",
+    "mercury": "Heavy Metal (Banned)",
+    "hydroquinone": "Hydroquinone (Banned Skin Lightener)"
+}
 
 @st.cache_data(ttl=1800)
 def load_data():
@@ -61,7 +77,7 @@ else:
     st.toast(f"✅ System Ready! Loaded {len(df)} substances.", icon="🟢")
 
 # ---------------------------------------------------------
-# 3. Intelligent Scan Logic (With Safety Filter)
+# 3. Intelligent Scan Logic (The Brain)
 # ---------------------------------------------------------
 col1, col2 = st.columns([2, 1])
 
@@ -70,38 +86,42 @@ with col1:
     user_input = st.text_area(
         "Paste Ingredient List:", 
         height=200, 
-        placeholder="e.g. Aqua, Glycerin, Isopropylparaben, 80-54-6..."
+        placeholder="e.g. Aqua, Glycerin, Methyl Alcohol, 80-54-6..."
     )
     
-    if st.button("🚀 Run Smart Scan", type="primary"):
+    if st.button("🚀 Run Full Audit", type="primary"):
         if user_input:
             risks = []
-            # معالجة النصوص: تقسيم بالفواصل أو الأسطر الجديدة
             raw_text = user_input.replace('\n', ',')
             ingredients = [x.strip().lower() for x in raw_text.split(',')]
             
             for item in ingredients:
                 if len(item) < 3: continue 
                 
-                # ✅ STEP 0: Check Safe List (Immunity)
+                # ✅ STEP 0: Check Safe List
                 if item in SAFE_LIST:
                     continue
 
-                # ❌ STEP 1: CAS Number Scan
+                # ☠️ STEP 1: Check Aliases (NEW FEATURE)
+                # يكتشف الأسماء الشائعة للمواد المحظورة فوراً
+                if item in DANGEROUS_ALIASES:
+                    real_name = DANGEROUS_ALIASES[item]
+                    risks.append(f"❌ **BANNED (Alias Match):** **'{item}'** is a known alias for **{real_name}**.")
+                    continue
+
+                # ❌ STEP 2: CAS Number Scan
                 if item in banned_cas:
                     risks.append(f"❌ **BANNED (CAS Match):** Code **'{item}'** is a prohibited substance.")
                     continue
 
-                # ❌ STEP 2: Exact Name Match
+                # ❌ STEP 3: Exact Name Match
                 if item in banned_names:
                     risks.append(f"❌ **BANNED (Direct Match):** The substance **'{item}'** is explicitly listed.")
                     continue
 
-                # ⚠️ STEP 3: Deep Substring Scan (The Hunter)
-                # تم رفع شرط الطول لتقليل الاخطاء
+                # ⚠️ STEP 4: Deep Substring Scan
                 substring_match = False
                 for banned in banned_names:
-                    # يجب أن تكون الكلمة المدخلة أطول من 5 أحرف لتفعيل البحث العميق
                     if len(item) > 5 and len(banned) > 6 and item in banned:
                         risks.append(f"⚠️ **BANNED (Hidden Match):** **'{item}'** was found inside: *'{banned[:50]}...'*")
                         substring_match = True
@@ -109,7 +129,7 @@ with col1:
                 
                 if substring_match: continue
 
-                # ❓ STEP 4: Fuzzy Logic (Typo Detection)
+                # ❓ STEP 5: Fuzzy Logic
                 matches = get_close_matches(item, banned_names, n=1, cutoff=0.85)
                 if matches:
                     risks.append(f"❓ **SUSPICIOUS (Typo?):** Did you mean **'{matches[0][:30]}...'**? It is BANNED.")
@@ -128,13 +148,13 @@ with col1:
 with col2:
     st.info("📊 **System Stats**")
     st.metric(label="Banned Substances", value=len(df))
-    st.metric(label="Safe List Items", value=len(SAFE_LIST))
-    st.write("**Mode:** Smart Filter V5.1 🧠")
+    st.metric(label="Known Aliases", value=len(DANGEROUS_ALIASES))
+    st.write("**Mode:** Full Audit (V6.0) 🛡️")
     st.markdown("---")
     with st.expander("ℹ️ Logic Explanation"):
         st.write("""
-        1. **Safe List:** Skips common safe items (Water, Alcohol, Glycerin).
-        2. **CAS Check:** Checks ID numbers.
-        3. **Hidden Match:** Finds banned items hidden in text.
-        4. **Typo Detector:** Catches misspellings.
+        1. **Safe List:** Skips approved items.
+        2. **Alias Check:** Detects common names (e.g. Methyl Alcohol -> Methanol).
+        3. **CAS Check:** Checks ID numbers.
+        4. **Hidden Match:** Finds banned items hidden in text.
         """)
