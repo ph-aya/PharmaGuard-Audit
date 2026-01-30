@@ -1,11 +1,13 @@
 # 🛡️ PharmaGuard: EU Compliance Auditor
 
-[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)](https://streamlit.io/)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://pharma-check-eu.streamlit.app/)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Compliance](https://img.shields.io/badge/Standard-EU%20CosIng%20Annex%20II-green?style=for-the-badge)](https://ec.europa.eu/growth/sectors/cosmetics/cosing_en)
 [![Automation](https://img.shields.io/badge/Automation-Google%20Apps%20Script-yellow?style=for-the-badge&logo=google)](https://script.google.com/)
 
-**PharmaGuard** is a robust, production-grade auditing tool designed to screen cosmetic formulations against the official **EU CosIng Annex II** list of prohibited substances. It utilizes a hybrid detection engine combining exact matching, fuzzy logic, deep substring scanning, and an intelligent safety filter to ensure high accuracy with zero false positives.
+> **🔴 Live Demo:** [Click here to use the App](https://pharma-check-eu.streamlit.app/)
+
+**PharmaGuard** is a robust, production-grade auditing tool designed to screen cosmetic formulations against the official **EU CosIng Annex II** list of prohibited substances.
 
 ---
 
@@ -99,4 +101,4 @@ PharmaGuard has been stress-tested against the following scenarios:
 This tool is intended for professional auditing assistance. While it syncs with official EU data, final regulatory compliance should always be cross-referenced with the latest official publications from the European Commission (CosIng).
 
 ---
-*Developed by Eng. Aya | Powered by Python, Streamlit & Google Cloud*
+*Developed by Ph. Aya | Powered by Python, Streamlit & Google Cloud*
