@@ -18,7 +18,7 @@ st.caption("Auto-synced with EU CosIng Annex II Database via GitHub Pipeline")
 # 2. Data Engine & Lists
 # ---------------------------------------------------------
 
-# ✅ قائمة الحصانة (المواد الآمنة)
+# ✅ قائمة الحصانة النهائية (تم تحديثها لتشمل الأمونيا والريزورسينول)
 SAFE_LIST = [
     "aqua", "water", "eau", "glycerin", "panthenol", "citric acid", 
     "phenoxyethanol", "tocopherol", "sodium benzoate", "potassium sorbate",
@@ -28,7 +28,8 @@ SAFE_LIST = [
     "alcohol", "alcohol denat", "ethanol", "propylene glycol", 
     "paraffinum liquidum", "mineral oil", "petrolatum", "kaolin", 
     "mica", "talc", "silica", "ci 77891", "titanium dioxide",
-    "isopropyl alcohol" # كحول التعقيم (مسموح)
+    "isopropyl alcohol", "ammonium hydroxide", "resorcinol",
+    "hydrogen peroxide"
 ]
 
 # ☠️ قاموس الأسماء المستعارة (المواد الخطرة بأسماء شائعة)
@@ -77,7 +78,7 @@ else:
     st.toast(f"✅ System Ready! Loaded {len(df)} substances.", icon="🟢")
 
 # ---------------------------------------------------------
-# 3. Intelligent Scan Logic (The Brain)
+# 3. Intelligent Scan Logic
 # ---------------------------------------------------------
 col1, col2 = st.columns([2, 1])
 
@@ -102,8 +103,7 @@ with col1:
                 if item in SAFE_LIST:
                     continue
 
-                # ☠️ STEP 1: Check Aliases (NEW FEATURE)
-                # يكتشف الأسماء الشائعة للمواد المحظورة فوراً
+                # ☠️ STEP 1: Check Aliases
                 if item in DANGEROUS_ALIASES:
                     real_name = DANGEROUS_ALIASES[item]
                     risks.append(f"❌ **BANNED (Alias Match):** **'{item}'** is a known alias for **{real_name}**.")
@@ -122,6 +122,7 @@ with col1:
                 # ⚠️ STEP 4: Deep Substring Scan
                 substring_match = False
                 for banned in banned_names:
+                    # شرط دقيق: الكلمة لازم تكون أطول من 5 والكلمة المحظورة أطول من 6
                     if len(item) > 5 and len(banned) > 6 and item in banned:
                         risks.append(f"⚠️ **BANNED (Hidden Match):** **'{item}'** was found inside: *'{banned[:50]}...'*")
                         substring_match = True
@@ -141,7 +142,7 @@ with col1:
                 for r in risks: st.markdown(r)
             else:
                 st.success("✅ AUDIT PASSED: No banned substances found.")
-                st.info("Note: Common safe ingredients (Aqua, Alcohol, Glycerin) are auto-approved.")
+                st.info("Note: Common safe ingredients are auto-approved.")
         else:
             st.warning("Enter ingredients to start.")
 
@@ -149,12 +150,12 @@ with col2:
     st.info("📊 **System Stats**")
     st.metric(label="Banned Substances", value=len(df))
     st.metric(label="Known Aliases", value=len(DANGEROUS_ALIASES))
-    st.write("**Mode:** Full Audit (V6.0) 🛡️")
+    st.write("**Mode:** Production V6.1 🏆")
     st.markdown("---")
     with st.expander("ℹ️ Logic Explanation"):
         st.write("""
-        1. **Safe List:** Skips approved items.
-        2. **Alias Check:** Detects common names (e.g. Methyl Alcohol -> Methanol).
+        1. **Safe List:** Skips approved items (e.g. Aqua, Ammonia).
+        2. **Alias Check:** Detects common names (e.g. Formalin).
         3. **CAS Check:** Checks ID numbers.
         4. **Hidden Match:** Finds banned items hidden in text.
         """)
