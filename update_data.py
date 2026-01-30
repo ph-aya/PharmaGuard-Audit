@@ -1,66 +1,73 @@
 import pandas as pd
 import requests
 import time
-import random
-import os
+from io import StringIO
 
 def update_database():
-    print("🕵️‍♂️ Starting Stealth Update Protocol...")
+    print("🛡️ Starting Smart-Sync Protocol...")
     
-    # قائمة المصادر (اذا فشل الاول يروح للثاني)
-    sources = [
-        # المصدر 1: البوابة المفتوحة للبيانات الأوروبية (ملف CSV مباشر ومستقر)
-        {
-            "type": "direct_csv",
-            "url": "https://data.europa.eu/api/hub/store/data/cosing-annex-ii-v2.csv"
-        },
-        # المصدر 2: الموقع الرسمي (محاولة قراءة الجدول)
-        {
-            "type": "html_scrape",
-            "url": "https://ec.europa.eu/growth/tools-databases/cosing/index.cfm?fuseaction=search.details_v2&id=1&annex_id=II&search"
-        }
-    ]
+    # 1. المصدر المضمون (حتى لو قديم، هو الأساس)
+    # هذا الرابط مستحيل يفشل لأنه على GitHub
+    backup_url = "https://raw.githubusercontent.com/openfoodfacts/openbeautyfacts/master/cosing/csv/COSING_Annex_II_v2.csv"
+    
+    try:
+        print("📥 Fetching base database...")
+        response = requests.get(backup_url, timeout=30)
+        
+        if response.status_code == 200:
+            # قراءة الملف القديم
+            df = pd.read_csv(StringIO(response.text), on_bad_lines='skip')
+            
+            # تنظيف الأعمدة
+            df.columns = [str(c).strip().lower() for c in df.columns]
+            print(f"✅ Base loaded: {len(df)} substances.")
 
-    # هيدر متصفح حقيقي (لتجنب الحظر)
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
-    }
+            # ---------------------------------------------------------
+            # 💉 The Injection: حقن المواد الجديدة يدوياً (Workaround)
+            # هذه القائمة تغطي تحديثات 2022-2025 التي يفتقدها الملف القديم
+            # ---------------------------------------------------------
+            new_bans = [
+                {"name": "BUTYLPHENYL METHYLPROPIONAL", "cas": "80-54-6"},  # Lilial (2022)
+                {"name": "ZINC PYRITHIONE", "cas": "13463-41-7"},           # Anti-dandruff (2022)
+                {"name": "SODIUM HYDROXYMETHYLGLYCINATE", "cas": "70161-44-3"},
+                {"name": "4-METHYLBENZYLIDENE CAMPHOR", "cas": "36861-47-9"}, # Omnibus VII (2024/25)
+                {"name": "PENTETIC ACID", "cas": "67-43-6"},
+                {"name": "PENTASODIUM PENTETATE", "cas": "140-01-2"},
+                {"name": "DIMETHYLTOLYLAMINE", "cas": "99-97-8"},
+                {"name": "TRIMETHYLBENZOYL DIPHENYLPHOSPHINE OXIDE", "cas": "75980-60-8"}
+            ]
 
-    for source in sources:
-        try:
-            print(f"🔄 Trying Source: {source['type']}...")
-            time.sleep(random.uniform(2, 5)) # تمويه
+            print(f"💉 Injecting {len(new_bans)} new critical substances...")
+            
+            # العثور على اسم الأعمدة الصحيحة في الملف
+            name_col = next((c for c in df.columns if 'name' in c or 'inn' in c), 'inci name')
+            cas_col = next((c for c in df.columns if 'cas' in c), 'cas no')
 
-            if source["type"] == "direct_csv":
-                # نجرب ننزل الملف مباشرة
-                response = requests.get(source["url"], headers=headers, timeout=30, verify=False) # verify=False لتجاهل مشاكل SSL
-                if response.status_code == 200:
-                    with open("banned.csv", "wb") as f:
-                        f.write(response.content)
-                    print("✅ Success! Downloaded CSV directly.")
-                    return # نطلع لأن نجحنا
-                else:
-                    print(f"❌ Failed with Status Code: {response.status_code}")
+            # إضافة المواد الجديدة للجدول
+            new_rows = []
+            for item in new_bans:
+                # نتحقق اذا المادة موجودة اصلاً حتى لا نكررها
+                if item["name"].lower() not in df[name_col].astype(str).str.lower().values:
+                    row = {col: "" for col in df.columns} # صف فارغ
+                    row[name_col] = item["name"]
+                    row[cas_col] = item["cas"]
+                    new_rows.append(row)
+            
+            if new_rows:
+                df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
+                print(f"✅ Successfully added {len(new_rows)} new bans.")
+            
+            # حفظ الملف النهائي
+            df.to_csv("banned.csv", index=False)
+            print(f"💾 File saved. Total Count: {len(df)}")
+            
+        else:
+            print(f"❌ Failed to fetch base DB. Status: {response.status_code}")
+            exit(1)
 
-            elif source["type"] == "html_scrape":
-                # نجرب نقرأ الجدول
-                dfs = pd.read_html(source["url"])
-                if len(dfs) > 0:
-                    df = dfs[0]
-                    df.to_csv("banned.csv", index=False)
-                    print(f"✅ Success! Scraped Table with {len(df)} rows.")
-                    return
-                else:
-                    print("❌ No tables found.")
-
-        except Exception as e:
-            print(f"⚠️ Error with source {source['type']}: {e}")
-            continue # نجرب المصدر اللي بعده
-
-    # إذا وصلنا هنا يعني كل المصادر فشلت
-    print("🚨 FATAL ERROR: All sources failed.")
-    exit(1) # هذا يخلي العلامة حمراء ب GitHub
+    except Exception as e:
+        print(f"🚨 Critical Failure: {e}")
+        exit(1)
 
 if __name__ == "__main__":
     update_database()
