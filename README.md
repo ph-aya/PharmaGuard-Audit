@@ -54,4 +54,4 @@ The system operates on a multi-layer filtration logic:
 This tool is intended for educational and preliminary auditing purposes. While it syncs with official EU data, final compliance verification should always be cross-referenced with the latest official publications from the European Commission.
 
 ---
-*Developed by Eng. Aya | Powered by Python & Streamlit*
+*Developed by Ph. Aya | Powered by Python & Streamlit*
