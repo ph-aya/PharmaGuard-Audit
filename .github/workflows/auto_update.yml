@@ -1,36 +1,37 @@
-name: 30-Min Compliance Sync
+name: Linux Hammer Update
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # السر: يشتغل كل 30 دقيقة
-  workflow_dispatch:        # زر يسمح لك بتشغيله يدوياً للتجربة
+    - cron: '0 * * * *' # كل ساعة
+  workflow_dispatch: # تشغيل يدوي
 
 jobs:
-  update-audit:
+  download-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: write       # صلاحية الكتابة لتحديث الملف
-      
+      contents: write
     steps:
-      - name: Checkout Repository
+      - name: Checkout Repo
         uses: actions/checkout@v3
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      - name: Install Libraries
+      - name: Force Download (Wget)
         run: |
-          pip install pandas requests lxml html5lib BeautifulSoup4
+          # محاولة سحب الملف بتمويه المتصفح
+          wget --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+               --header="Accept: text/csv,application/csv" \
+               -O banned.csv \
+               "https://data.europa.eu/api/hub/store/data/cosing-annex-ii-v2.csv"
+          
+          # التحقق: اذا الملف فارغ احذفه وافشل
+          if [ ! -s banned.csv ]; then
+            echo "File is empty!"
+            exit 1
+          fi
 
-      - name: Run Spy Script
-        run: python update_data.py
-
-      - name: Commit & Push Changes
+      - name: Commit and Push
         run: |
-          git config --global user.name "PharmaGuard Bot"
-          git config --global user.email "bot@pharmaguard.ai"
+          git config --global user.name "AutoBot"
+          git config --global user.email "bot@audit.com"
           git add banned.csv
-          # نتحقق اذا اكو تحديث حقيقي لو لا
-          git diff --quiet && git diff --staged --quiet || (git commit -m "⚡ Auto-sync: EU Database Updated" && git push)
+          # اذا اكو تغيير، سوي Push. اذا ماكو، اسكت.
+          git diff --quiet && git diff --staged --quiet || (git commit -m "📦 CSV Update" && git push)
