@@ -1,0 +1,25 @@
+name: Node.js 30-Min Sync
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    - run: npm install
+    - run: node updater.js
+    - name: Commit & Push
+      run: |
+        git config --global user.name "NodeBot"
+        git config --global user.email "bot@pharma.ai"
+        git add banned.csv
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Update Data" && git push)
