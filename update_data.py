@@ -4,61 +4,89 @@ from io import StringIO
 import os
 import sys
 
-def real_update():
-    print("🌐 Connecting to Official Database Source...")
+def cdn_update():
+    print("⚡ Starting CDN Bypass Protocol (jsDelivr)...")
 
-    # هذا الرابط هو "مرآة" (Mirror) طبق الأصل لقاعدة بيانات الاتحاد الأوروبي
-    # موجودة على GitHub (فرع main) وتتحدث اوتوماتيكياً
-    # المصدر: OpenBeautyFacts (المصدر المفتوح المعتمد عالمياً)
-    url = "https://raw.githubusercontent.com/openfoodfacts/openbeautyfacts/main/cosing/csv/COSING_Annex_II_v2.csv"
+    # نستخدم شبكة توصيل محتوى (CDN) بدلاً من الرابط المباشر
+    # هذه الشبكة لا تحظر الروبوتات وسريعة جداً
+    cdn_url = "https://cdn.jsdelivr.net/gh/openfoodfacts/openbeautyfacts@main/cosing/csv/COSING_Annex_II_v2.csv"
     
-    try:
-        # 1. التحميل (بدون أي لف ودوران)
-        response = requests.get(url, timeout=45)
-        
-        if response.status_code == 200:
-            print("✅ Connection Established. Downloading...")
-            
-            # 2. القراءة الذكية (Smart Parsing)
-            # engine='python' و sep=None: يخلي بايثون يكتشف الفاصلة وحده (سواء كانت ; أو ,)
-            # هذا يحل مشكلة "الأسطر اللازكة" اللي طلعتلك قبل شويه
-            df = pd.read_csv(StringIO(response.text), sep=None, engine='python', on_bad_lines='skip')
-            
-            # 3. التحقق من الحجم (Quality Control)
-            # إذا الملف اقل من 500 مادة، معناه الملف المعروض بالسيرفر مضروب
-            if len(df) < 500:
-                print(f"⚠️ Error: Downloaded file is empty or too small ({len(df)} rows).")
-                sys.exit(1) # نفصل فوراً، ما نجامل
+    # رابط احتياطي ثاني
+    backup_url = "https://raw.githubusercontent.com/openfoodfacts/openbeautyfacts/main/cosing/csv/COSING_Annex_II_v2.csv"
 
-            # 4. تنظيف العناوين
-            df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]
+    final_df = None
 
-            # 5. البحث عن الأعمدة وتوحيدها
-            # ندور على اي عمود اسمه name ونسميه inci_name
-            name_col = next((c for c in df.columns if 'name' in c or 'inn' in c), None)
-            cas_col = next((c for c in df.columns if 'cas' in c), None)
-
-            if name_col:
-                df.rename(columns={name_col: 'inci_name', cas_col: 'cas_no'}, inplace=True)
-                
-                # إبقاء الأعمدة الصافية فقط
-                if 'cas_no' not in df.columns: df['cas_no'] = ''
-                final_df = df[['inci_name', 'cas_no']]
-                
-                # الحفظ
-                final_df.to_csv("banned.csv", index=False)
-                print(f"🎉 SUCCESS: Real Database Updated. Total Substances: {len(final_df)}")
+    # دالة محاولة التحميل
+    def try_download(target_url, source_name):
+        try:
+            print(f"📡 Contacting {source_name}...")
+            response = requests.get(target_url, timeout=30)
+            if response.status_code == 200:
+                # قراءة ذكية للفواصل
+                data = pd.read_csv(StringIO(response.text), sep=None, engine='python', on_bad_lines='skip')
+                if len(data) > 500:
+                    print(f"✅ Success from {source_name}! Got {len(data)} rows.")
+                    return data
+                else:
+                    print(f"⚠️ File too small from {source_name}.")
             else:
-                print("❌ Structure Error: Columns not found in the source file.")
-                sys.exit(1)
+                print(f"❌ Status {response.status_code} from {source_name}.")
+        except Exception as e:
+            print(f"⚠️ Error from {source_name}: {e}")
+        return None
 
+    # 1. المحاولة الأولى: عبر الـ CDN
+    final_df = try_download(cdn_url, "CDN Mirror")
+
+    # 2. المحاولة الثانية: عبر المصدر المباشر (اذا فشل الاول)
+    if final_df is None:
+        print("🔄 Switching to Direct Source...")
+        final_df = try_download(backup_url, "GitHub Raw")
+
+    # 3. مرحلة الحفظ (The Safety Lock)
+    if final_df is not None:
+        # تنظيف العناوين
+        final_df.columns = [str(c).strip().lower().replace(' ', '_') for c in final_df.columns]
+        
+        # توحيد الأسماء
+        name_col = next((c for c in final_df.columns if 'name' in c or 'inn' in c), None)
+        cas_col = next((c for c in final_df.columns if 'cas' in c), None)
+
+        if name_col:
+            final_df.rename(columns={name_col: 'inci_name', cas_col: 'cas_no'}, inplace=True)
+            
+            # 💉 حقن المواد الجديدة 2025 (لضمان الحداثة)
+            print("💉 Injecting 2025 Updates...")
+            new_bans = pd.DataFrame([
+                {"inci_name": "BUTYLPHENYL METHYLPROPIONAL", "cas_no": "80-54-6"},
+                {"inci_name": "ZINC PYRITHIONE", "cas_no": "13463-41-7"},
+                {"inci_name": "4-METHYLBENZYLIDENE CAMPHOR", "cas_no": "36861-47-9"},
+                {"inci_name": "PENTETIC ACID", "cas_no": "67-43-6"},
+                {"inci_name": "PENTASODIUM PENTETATE", "cas_no": "140-01-2"},
+                {"inci_name": "DIMETHYLTOLYLAMINE", "cas_no": "99-97-8"},
+                {"inci_name": "SODIUM HYDROXYMETHYLGLYCINATE", "cas_no": "70161-44-3"},
+                {"inci_name": "TRIMETHYLBENZOYL DIPHENYLPHOSPHINE OXIDE", "cas_no": "75980-60-8"},
+                {"inci_name": "CHLOROFORM", "cas_no": "67-66-3"},
+                {"inci_name": "HYDROQUINONE", "cas_no": "123-31-9"}
+            ])
+            
+            # دمج وحذف التكرار
+            if 'cas_no' not in final_df.columns: final_df['cas_no'] = ''
+            final_df = pd.concat([final_df, new_bans], ignore_index=True)
+            final_df.drop_duplicates(subset=['inci_name'], keep='last', inplace=True)
+            
+            # حفظ الملف
+            final_df.to_csv("banned.csv", index=False)
+            print(f"💾 SAVED 'banned.csv' with {len(final_df)} entries.")
+            sys.exit(0) # خروج ناجح
         else:
-            print(f"❌ Server Connection Failed: {response.status_code}")
+            print("❌ Column mismatch in downloaded file.")
             sys.exit(1)
-
-    except Exception as e:
-        print(f"💀 Fatal Error: {e}")
+    else:
+        # إذا فشل كل شيء، لا تمسح الملف القديم!
+        # نخرج بخطأ لكن نبقي الملف القديم كما هو (اذا كان موجوداً)
+        print("🚨 ALL DOWNLOADS FAILED. Keeping old file if exists.")
         sys.exit(1)
 
 if __name__ == "__main__":
-    real_update()
+    cdn_update()
