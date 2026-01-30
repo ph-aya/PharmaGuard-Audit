@@ -139,4 +139,5 @@ else:
 
 # Footer
 st.markdown("---")
-st.caption("PharmaGuard v2.1 | Engineered for Regulatory Agility")
+
+st.caption("PharmaGuard v2.1 | developed by Aya Omar | Engineered for Regulatory Agility")
