@@ -3,7 +3,7 @@ import pandas as pd
 from difflib import get_close_matches
 
 # ---------------------------------------------------------
-# 1. إعدادات الصفحة
+# 1. App Configuration
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="PharmaGuard Audit", 
@@ -11,22 +11,22 @@ st.set_page_config(
     page_icon="🛡️"
 )
 
-st.title("🛡️ PharmaGuard: Live Compliance Auditor")
-st.caption("Auto-synced with EU Cosing Annex II via GitHub")
+st.title("🛡️ PharmaGuard: EU Compliance Auditor")
+st.caption("Auto-synced with EU CosIng Annex II Database via GitHub Pipeline")
 
 # ---------------------------------------------------------
-# 2. محرك البيانات (المربوط بـ GitHub مالتج)
+# 2. Data Engine (Auto-Sync)
 # ---------------------------------------------------------
-@st.cache_data(ttl=1800) # تحديث كل 30 دقيقة
+@st.cache_data(ttl=1800) # Auto-refresh every 30 mins
 def load_data():
-    # الرابط المباشر لملفك المحدث
+    # Direct link to your auto-updated file
     url = "https://raw.githubusercontent.com/ph-aya/PharmaGuard-Audit/main/banned.csv"
     
     try:
-        # قراءة الملف مع تخطي الأسطر التالفة
+        # Load CSV with robust error handling
         df = pd.read_csv(url, on_bad_lines='skip', engine='python')
         
-        # توحيد أسماء الأعمدة لتسهيل البحث
+        # Normalize column names to standard internal IDs
         df = df.rename(columns={
             'Chemical name / INN': 'inci_name',
             'CAS Number': 'cas_no',
@@ -34,10 +34,11 @@ def load_data():
             'Reference Number': 'ref_no'
         })
         
-        # تنظيف البيانات (مسح الفراغات وتحويل لصغير)
+        # Data Cleaning & Preprocessing
         if 'inci_name' in df.columns:
+            # Convert to lowercase and strip whitespace
             df['inci_name'] = df['inci_name'].astype(str).str.strip().str.lower()
-            # إزالة الرموز الغريبة من الأسماء إن وجدت
+            # Remove special characters for better matching
             df['inci_name'] = df['inci_name'].str.replace(r'[^\w\s-]', '', regex=True)
         
         if 'cas_no' in df.columns:
@@ -46,87 +47,87 @@ def load_data():
         return df
 
     except Exception as e:
-        st.error(f"❌ خطأ في الاتصال بقاعدة البيانات: {e}")
+        st.error(f"❌ Critical Error: Failed to connect to live database. {e}")
         return pd.DataFrame()
 
-# تحميل البيانات
-with st.spinner('جاري سحب البيانات المحدثة من السيرفر...'):
+# Load Data
+with st.spinner('Syncing with EU Server...'):
     df = load_data()
 
-# التأكد من وجود البيانات
+# Validation Check
 if df.empty:
-    st.warning("⚠️ النظام يعمل، ولكن لا توجد بيانات. تأكد من تحديث الملف في GitHub.")
+    st.warning("⚠️ System is running in safe mode. No data available from GitHub.")
     st.stop()
 else:
-    # تجهيز قوائم البحث السريع
+    # Prepare lookup lists for speed
     banned_names = df['inci_name'].tolist()
     banned_cas = df['cas_no'].tolist()
     
-    # عرض حالة الاتصال (يختفي بعد ثواني)
-    st.toast(f"✅ تم الاتصال بنجاح! عدد المواد المحظورة: {len(df)}", icon="🟢")
+    # Success Toast
+    st.toast(f"✅ Database Synced! Loaded {len(df)} banned substances.", icon="🟢")
 
 # ---------------------------------------------------------
-# 3. واجهة المستخدم والبحث
+# 3. User Interface & Logic
 # ---------------------------------------------------------
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.subheader("🔍 فحص المكونات")
+    st.subheader("🔍 Ingredient Scanner")
     user_input = st.text_area(
-        "الصق قائمة المكونات هنا (افصل بينها بفواصل):", 
+        "Paste Ingredient List (Comma Separated):", 
         height=200, 
-        placeholder="مثال: Aqua, Glycerin, Hydroquinone, Lilial..."
+        placeholder="e.g. Aqua, Glycerin, Lilial, Butylphenyl Methylpropional..."
     )
     
-    if st.button("🚀 ابدأ الفحص (Run Audit)", type="primary"):
+    if st.button("🚀 Run Audit", type="primary"):
         if user_input:
             risks = []
-            # تحويل النص المدخل إلى قائمة
+            # Parse input: split by comma, strip spaces, convert to lowercase
             ingredients = [x.strip().lower() for x in user_input.replace('\n', ',').split(',')]
             
             for item in ingredients:
-                if len(item) < 2: continue # تجاهل الكلمات القصيرة جداً
+                if len(item) < 2: continue # Skip empty/short strings
                 
-                # 1. بحث عن الاسم (Exact Match)
+                # A. Exact Name Match
                 if item in banned_names:
-                    risks.append(f"❌ **محظور (CRITICAL):** المادة **'{item}'** موجودة في قائمة المنع!")
+                    risks.append(f"❌ **BANNED (Direct Match):** The substance **'{item}'** is prohibited in the EU.")
                     continue
                     
-                # 2. بحث عن رقم CAS
+                # B. CAS Number Match
                 if item in banned_cas:
-                    risks.append(f"❌ **محظور (CAS Match):** الكود **'{item}'** يعود لمادة محظورة.")
+                    risks.append(f"❌ **BANNED (CAS Match):** Code **'{item}'** corresponds to a prohibited substance.")
                     continue
 
-                # 3. الذكاء الاصطناعي (Fuzzy Search) - لكشف الأخطاء الإملائية
-                # يبحث عن أقرب كلمة تشبه المدخل بنسبة 85%
+                # C. Fuzzy Logic (Typo Detection)
+                # Finds matches with >85% similarity
                 matches = get_close_matches(item, banned_names, n=1, cutoff=0.85)
                 if matches:
-                    risks.append(f"⚠️ **اشتباه (Typo?):** هل تقصد **'{matches[0]}'**؟ هذه المادة محظورة!")
+                    risks.append(f"⚠️ **SUSPICIOUS (Typo?):** Did you mean **'{matches[0]}'**? It is BANNED.")
             
-            # عرض النتائج
+            # Display Results
             st.markdown("---")
             if risks:
-                st.error(f"🚫 فشل الفحص: تم العثور على {len(risks)} مخالفات.")
+                st.error(f"🚫 AUDIT FAILED: Found {len(risks)} compliance violations.")
                 for r in risks: 
                     st.markdown(r)
             else:
-                st.success("✅ سليم: لم يتم العثور على أي مواد محظورة من القائمة الحالية.")
-                st.caption("ملاحظة: هذه النتيجة تعتمد على قاعدة بيانات CosIng Annex II المحدثة.")
+                st.success("✅ AUDIT PASSED: No banned substances found.")
+                st.caption("Note: Result is based on the current version of EU Annex II.")
         else:
-            st.warning("الرجاء إدخال مواد للفحص.")
+            st.warning("Please enter ingredients to scan.")
 
 with col2:
-    st.info("📊 **إحصائيات قاعدة البيانات**")
-    st.write(f"**عدد المواد:** {len(df)}")
-    st.write("**المصدر:** EU CosIng Annex II")
-    st.write("**حالة التحديث:** Auto-Synced via GitHub 🟢")
+    st.info("📊 **Database Status**")
+    st.write(f"**Total Substances:** {len(df)}")
+    st.write("**Source:** EU CosIng Annex II")
+    st.write("**Last Sync:** Live via GitHub 🟢")
     st.markdown("---")
-    with st.expander("ℹ️ كيف يعمل النظام؟"):
+    with st.expander("ℹ️ How it works"):
         st.write("""
-        هذا النظام متصل مباشرة بملف CSV على GitHub يتم تحديثه تلقائياً.
-        يقوم بمقارنة مدخلاتك مع القائمة الرسمية للمواد المحظورة، ويكشف حتى عن الأخطاء الإملائية البسيطة.
+        This tool cross-references your input against the official EU list of prohibited cosmetic substances.
+        It uses exact matching, CAS number verification, and fuzzy logic to detect hidden or misspelled risks.
         """)
 
-# تذييل الصفحة
+# Footer
 st.markdown("---")
 st.caption("PharmaGuard Audit System | v3.0 Auto-Pilot Edition")
