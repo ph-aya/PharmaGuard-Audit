@@ -2,53 +2,65 @@ import pandas as pd
 import requests
 import time
 import random
-from io import StringIO
 import os
 
 def update_database():
-    # 1. التمويه: ننتظر وقت عشوائي بين 2 و 10 ثواني (كأننا بشر)
-    sleep_time = random.uniform(2, 10)
-    print(f"🕵️‍♂️ Waiting for {sleep_time:.2f} seconds to avoid detection...")
-    time.sleep(sleep_time)
-
-    # 2. الرابط الرسمي المباشر للاتحاد الأوروبي (Annex II)
-    # ملاحظة: هذا الرابط قد يتغير مستقبلاً، لذا وضعنا كود يكشف الخطأ
-    url = "https://ec.europa.eu/growth/tools-databases/cosing/index.cfm?fuseaction=search.details_v2&id=1&annex_id=II&search"
+    print("🕵️‍♂️ Starting Stealth Update Protocol...")
     
-    # رابط بديل مباشر في حال فشل الأول (من بوابة البيانات المفتوحة)
-    backup_url = "https://data.europa.eu/api/hub/store/data/cosing-annex-ii-v2.csv"
+    # قائمة المصادر (اذا فشل الاول يروح للثاني)
+    sources = [
+        # المصدر 1: البوابة المفتوحة للبيانات الأوروبية (ملف CSV مباشر ومستقر)
+        {
+            "type": "direct_csv",
+            "url": "https://data.europa.eu/api/hub/store/data/cosing-annex-ii-v2.csv"
+        },
+        # المصدر 2: الموقع الرسمي (محاولة قراءة الجدول)
+        {
+            "type": "html_scrape",
+            "url": "https://ec.europa.eu/growth/tools-databases/cosing/index.cfm?fuseaction=search.details_v2&id=1&annex_id=II&search"
+        }
+    ]
 
-    print("🚀 Connecting to EU Server...")
-    
+    # هيدر متصفح حقيقي (لتجنب الحظر)
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
     }
 
-    try:
-        # محاولة قراءة الجدول مباشرة من الصفحة (أقوى طريقة)
-        # نقرأ كل الجداول في الصفحة، وعادة الجدول الكبير هو المطلوب
-        dfs = pd.read_html(url)
-        df = dfs[0] # الجدول الأول
-        
-        # حفظ الملف
-        df.to_csv("banned.csv", index=False)
-        print(f"✅ Success! Updated 'banned.csv' with {len(df)} substances.")
-        
-    except Exception as e:
-        print(f"⚠️ Primary method failed: {e}")
-        print("🔄 Trying backup method...")
+    for source in sources:
         try:
-            response = requests.get(backup_url, headers=headers, timeout=15)
-            if response.status_code == 200:
-                with open("banned.csv", "wb") as f:
-                    f.write(response.content)
-                print("✅ Backup Success! File saved.")
-            else:
-                print("❌ Backup failed.")
-                exit(1) # نخرج بخطأ حتى GitHub ينبهنا
-        except Exception as e2:
-            print(f"❌ Critical Error: {e2}")
-            exit(1)
+            print(f"🔄 Trying Source: {source['type']}...")
+            time.sleep(random.uniform(2, 5)) # تمويه
+
+            if source["type"] == "direct_csv":
+                # نجرب ننزل الملف مباشرة
+                response = requests.get(source["url"], headers=headers, timeout=30, verify=False) # verify=False لتجاهل مشاكل SSL
+                if response.status_code == 200:
+                    with open("banned.csv", "wb") as f:
+                        f.write(response.content)
+                    print("✅ Success! Downloaded CSV directly.")
+                    return # نطلع لأن نجحنا
+                else:
+                    print(f"❌ Failed with Status Code: {response.status_code}")
+
+            elif source["type"] == "html_scrape":
+                # نجرب نقرأ الجدول
+                dfs = pd.read_html(source["url"])
+                if len(dfs) > 0:
+                    df = dfs[0]
+                    df.to_csv("banned.csv", index=False)
+                    print(f"✅ Success! Scraped Table with {len(df)} rows.")
+                    return
+                else:
+                    print("❌ No tables found.")
+
+        except Exception as e:
+            print(f"⚠️ Error with source {source['type']}: {e}")
+            continue # نجرب المصدر اللي بعده
+
+    # إذا وصلنا هنا يعني كل المصادر فشلت
+    print("🚨 FATAL ERROR: All sources failed.")
+    exit(1) # هذا يخلي العلامة حمراء ب GitHub
 
 if __name__ == "__main__":
     update_database()
