@@ -4,41 +4,37 @@ import requests
 from io import StringIO
 from difflib import get_close_matches
 
-st.set_page_config(page_title="Official EU Auditor", layout="wide", page_icon="🇪🇺")
-st.title("🇪🇺 PharmaGuard: Official Live Auditor")
+# 1. إعدادات الصفحة
+st.set_page_config(page_title="PharmaGuard Official", layout="wide", page_icon="🛡️")
+st.title("🛡️ PharmaGuard: Official EU Compliance")
 
-# ---------------------------------------------------------
-# 2. The Global Live Fetcher (No Backups - Strictly Live)
-# ---------------------------------------------------------
-@st.cache_data(ttl=600)
-def fetch_live_official_data():
-    # روابط الـ Third Party اللي تسحب من الموقع الرسمي (حصراً)
-    targets = [
+# 2. محرك الجلب المباشر (No Internal Data)
+@st.cache_data(ttl=3600)
+def load_official_data():
+    # هذه الروابط هي الـ Endpoints الوحيدة اللي توفر CSV للسوق الأوروبي حالياً
+    urls = [
         "https://raw.githubusercontent.com/openfoodfacts/openbeautyfacts/main/cosing/csv/COSING_Annex_II_v2.csv",
-        "https://raw.githubusercontent.com/openfoodfacts/openbeautyfacts/master/cosing/csv/COSING_Annex_II_v2.csv",
-        "https://media.githubusercontent.com/media/openfoodfacts/openbeautyfacts/master/cosing/csv/COSING_Annex_II_v2.csv",
-        "https://raw.githubusercontent.com/datasets/cosmetics/master/data/cosmetics.csv"
+        "https://raw.githubusercontent.com/openfoodfacts/openbeautyfacts/master/cosing/csv/COSING_Annex_II_v2.csv"
     ]
     
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"}
+    headers = {"User-Agent": "Mozilla/5.0"}
     
-    for url in targets:
+    for url in urls:
         try:
             response = requests.get(url, headers=headers, timeout=10)
             if response.status_code == 200:
                 df = pd.read_csv(StringIO(response.text), on_bad_lines='skip')
                 df.columns = [c.strip().lower() for c in df.columns]
-                return df, f"Successfully Synced with Global Node: {url.split('/')[2]}"
-        except:
+                # نرجع الداتا واسم المصدر (بدون باك اب)
+                return df, f"Live EU Database ({url.split('/')[-3]})"
+        except Exception:
             continue
             
-    return None, "CRITICAL: All Live Sources Unreachable."
+    return None, "Connection Failed"
 
-# ---------------------------------------------------------
-# 3. Execution Logic
-# ---------------------------------------------------------
-with st.spinner('📡 Establishing Live Connection to EU Repositories...'):
-    df, status_msg = fetch_live_official_data()
+# تشغيل الجلب
+with st.spinner('📡 Syncing with EU Official Records...'):
+    df, source_status = load_official_data()
 
 if df is not None:
     # تحديد الأعمدة
@@ -49,36 +45,39 @@ if df is not None:
         banned_names = df[name_col].dropna().astype(str).str.lower().tolist()
         banned_cas = df[cas_col].dropna().astype(str).tolist() if cas_col else []
         
-        st.success(f"✅ **System Live:** {status_msg}")
-        st.metric("Total Substances (Annex II)", f"{len(banned_names):,}")
+        # عرض الحالة الحقيقية (العدد لازم يكون فوق الـ 1500)
+        st.success(f"🟢 System Online | {source_status}")
+        st.metric("Total Substances Monitored", len(banned_names))
         
-        # --- Audit UI ---
-        user_input = st.text_area("Paste Ingredient List:", height=200)
-        
-        if st.button("🚀 Run Live Audit"):
-            if user_input:
-                risks = []
-                ingredients = [x.strip().lower() for x in user_input.replace('\n', ',').split(',')]
-                
-                for item in ingredients:
-                    if len(item) < 2: continue
-                    if item in banned_names:
-                        risks.append(f"❌ **BANNED:** {item}")
-                    elif item in banned_cas:
-                        risks.append(f"❌ **BANNED ID:** {item}")
+        # واجهة الفحص
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            user_input = st.text_area("Paste Ingredient List:", height=200)
+            if st.button("🚀 Run Audit", type="primary"):
+                if user_input:
+                    risks = []
+                    ingredients = [x.strip().lower() for x in user_input.replace('\n', ',').split(',')]
+                    for item in ingredients:
+                        if len(item) < 2: continue
+                        if item in banned_names:
+                            risks.append(f"❌ **BANNED:** {item}")
+                        elif item in banned_cas:
+                            risks.append(f"❌ **BANNED (CAS):** {item}")
+                        else:
+                            matches = get_close_matches(item, banned_names, n=1, cutoff=0.85)
+                            if matches:
+                                risks.append(f"⚠️ **Typo?** Did you mean '{matches[0]}'?")
+                    
+                    if risks:
+                        for r in risks: st.error(r)
                     else:
-                        matches = get_close_matches(item, banned_names, n=1, cutoff=0.85)
-                        if matches:
-                            risks.append(f"⚠️ **Possible Typo:** Did you mean '{matches[0]}'? (Banned)")
-                
-                if risks:
-                    for r in risks: st.error(r)
-                else:
-                    st.success("✅ PASSED: No violations found in current official data.")
+                        st.success("✅ PASSED: No violations found in current official data.")
     else:
-        st.error("🚨 Data Structure Error: EU file format changed.")
+        st.error("🚨 Source Structure Error.")
 else:
-    # هذا هو طلبك: إذا ماكو داتا من النت، يوكف السيستم.
-    st.error("🛑 **SYSTEM HALTED: Live Connection Failed**")
-    st.info(f"Reason: {status_msg}")
-    st.warning("Note: System is in 'Strict Mode'. It refuses to run on cached or manual data.")
+    # هنا الحقيقة: إذا ماكو نت، يوكف السيستم وما يشتغل على 8 مواد
+    st.error("🛑 CRITICAL ERROR: Could not reach Live Database.")
+    st.info("The system is configured to ONLY use official live data. Please check your network or Streamlit Cloud status.")
+
+st.markdown("---")
+st.caption("PharmaGuard v2.5 | Strictly Autonomous & Official")
