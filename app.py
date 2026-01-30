@@ -38,7 +38,7 @@ def fetch_live_official_data():
 # 3. Execution Logic
 # ---------------------------------------------------------
 with st.spinner('📡 Establishing Live Connection to EU Repositories...'):
-    df, status_msg = fetch_live_data = fetch_live_official_data()
+    df, status_msg = fetch_live_official_data()
 
 if df is not None:
     # تحديد الأعمدة
