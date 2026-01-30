@@ -3,16 +3,89 @@ import pandas as pd
 from difflib import get_close_matches
 
 # ---------------------------------------------------------
-# 1. App Configuration
+# 1. App Configuration & Cyber-Green Styling 🎨
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="PharmaGuard Audit", 
     layout="wide", 
-    page_icon="🛡️"
+    page_icon="🛡️",
+    initial_sidebar_state="collapsed"
 )
 
+# 🔥 حقن كود CSS لفرض الثيم الأسود والأخضر
+st.markdown("""
+    <style>
+    /* 1. الخلفية العامة والنصوص */
+    .stApp {
+        background-color: #0E1117;
+        color: #E0E0E0;
+    }
+    
+    /* 2. العناوين الرئيسية باللون الأخضر المشع */
+    h1, h2, h3, h4 {
+        color: #00FF99 !important;
+        font-family: 'Segoe UI', sans-serif;
+    }
+    
+    /* 3. تصميم الزر الرئيسي (Primary Button) */
+    div.stButton > button:first-child {
+        background: linear-gradient(45deg, #006400, #00FF99);
+        color: white;
+        font-weight: bold;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 24px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 255, 153, 0.2);
+    }
+    div.stButton > button:first-child:hover {
+        background: linear-gradient(45deg, #00FF99, #006400);
+        box-shadow: 0 6px 20px rgba(0, 255, 153, 0.6);
+        transform: translateY(-2px);
+    }
+
+    /* 4. مربع النص (Text Area) */
+    .stTextArea textarea {
+        background-color: #1A1C24;
+        color: #00FF99; /* الكتابة بالأخضر */
+        border: 1px solid #333;
+        border-radius: 8px;
+    }
+    .stTextArea textarea:focus {
+        border: 1px solid #00FF99;
+        box-shadow: 0 0 10px rgba(0, 255, 153, 0.2);
+    }
+
+    /* 5. الأرقام والإحصائيات */
+    [data-testid="stMetricValue"] {
+        color: #00FF99 !important;
+    }
+
+    /* 6. التنبيهات (Success/Error/Info) - تخصيص بسيط */
+    .stAlert {
+        background-color: #1A1C24;
+        border: 1px solid #333;
+    }
+    
+    /* 7. الفوتر المخصص */
+    .footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background-color: #0E1117;
+        color: #666;
+        text-align: center;
+        padding: 10px;
+        border-top: 1px solid #333;
+        font-size: 14px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# العنوان الرئيسي
 st.title("🛡️ PharmaGuard: EU Compliance Auditor")
-st.caption("Auto-synced with EU CosIng Annex II Database via GitHub Pipeline")
+st.markdown("<p style='color: #888;'>Auto-synced with EU CosIng Annex II Database via GitHub Pipeline 🟢</p>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------
 # 2. Data Engine & Lists
@@ -144,10 +217,18 @@ with col1:
             st.warning("Enter ingredients to start.")
 
 with col2:
-    st.info("📊 **System Stats**")
+    # تنسيق خاص للصندوق الجانبي
+    st.markdown("""
+    <div style="background-color: #1A1C24; padding: 20px; border-radius: 10px; border: 1px solid #333;">
+        <h3 style="color: #00FF99; margin-top: 0;">📊 System Stats</h3>
+    """, unsafe_allow_html=True)
+    
     st.metric(label="Banned Substances", value=len(df))
     st.metric(label="Known Aliases", value=len(DANGEROUS_ALIASES))
     st.write("**Mode:** Production V6.2 🏆")
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
     st.markdown("---")
     with st.expander("ℹ️ Logic Explanation"):
         st.write("""
@@ -163,9 +244,9 @@ with col2:
 st.markdown("---")
 st.markdown(
     """
-    <div style='text-align: center; color: #666;'>
-        <h4>Developed by Ph. Aya Omar 👩‍🔬</h4>
-        <p>Powered by PharmaGuard Engine | © 2026</p>
+    <div style='text-align: center; padding: 20px;'>
+        <h4 style='color: #00FF99;'>Developed by Ph. Aya Omar 👩‍🔬</h4>
+        <p style='color: #888;'>Powered by PharmaGuard Engine | © 2026</p>
     </div>
     """, 
     unsafe_allow_html=True
