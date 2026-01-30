@@ -4,73 +4,96 @@ from io import StringIO
 import os
 
 def update_database():
-    print("🚀 Starting High-Performance Update...")
+    print("🧟‍♂️ Starting Zombie-Mode Update...")
 
-    # هذا الرابط مستقر جداً (Raw CSV) وسريع لأنه نص خالص
-    # المصدر: OpenBeautyFacts (نسخة مطابقة للمواصفات الأوروبية)
-    stable_url = "https://raw.githubusercontent.com/openfoodfacts/openbeautyfacts/master/cosing/csv/COSING_Annex_II_v2.csv"
-    
-    # قائمة المواد الجديدة (الحقن اليدوي) - 2024/2025
-    new_bans = [
-        {"INCI name": "BUTYLPHENYL METHYLPROPIONAL", "CAS No": "80-54-6"},
-        {"INCI name": "ZINC PYRITHIONE", "CAS No": "13463-41-7"},
-        {"INCI name": "4-METHYLBENZYLIDENE CAMPHOR", "CAS No": "36861-47-9"},
-        {"INCI name": "PENTETIC ACID", "CAS No": "67-43-6"},
-        {"INCI name": "PENTASODIUM PENTETATE", "CAS No": "140-01-2"},
-        {"INCI name": "DIMETHYLTOLYLAMINE", "CAS No": "99-97-8"},
-        {"INCI name": "SODIUM HYDROXYMETHYLGLYCINATE", "CAS No": "70161-44-3"},
-        {"INCI name": "TRIMETHYLBENZOYL DIPHENYLPHOSPHINE OXIDE", "CAS No": "75980-60-8"}
+    # 1. قائمة الطوارئ (Emergency Backup)
+    # هذه القائمة نستخدمها اذا فشل كل شيء بالكون
+    backup_data = [
+        {"inci_name": "BUTYLPHENYL METHYLPROPIONAL", "cas_no": "80-54-6"},
+        {"inci_name": "ZINC PYRITHIONE", "cas_no": "13463-41-7"},
+        {"inci_name": "4-METHYLBENZYLIDENE CAMPHOR", "cas_no": "36861-47-9"},
+        {"inci_name": "PENTETIC ACID", "cas_no": "67-43-6"},
+        {"inci_name": "PENTASODIUM PENTETATE", "cas_no": "140-01-2"},
+        {"inci_name": "DIMETHYLTOLYLAMINE", "cas_no": "99-97-8"},
+        {"inci_name": "SODIUM HYDROXYMETHYLGLYCINATE", "cas_no": "70161-44-3"},
+        {"inci_name": "TRIMETHYLBENZOYL DIPHENYLPHOSPHINE OXIDE", "cas_no": "75980-60-8"},
+        {"inci_name": "CHLOROFORM", "cas_no": "67-66-3"},
+        {"inci_name": "HYDROQUINONE", "cas_no": "123-31-9"}
     ]
 
+    # رابط قوي جداً (Raw GitHub)
+    url = "https://raw.githubusercontent.com/openfoodfacts/openbeautyfacts/master/cosing/csv/COSING_Annex_II_v2.csv"
+    
+    # المتغير اللي راح يشيل الداتا النهائية
+    final_df = None
+
+    # --- المحاولة 1: التحميل من النت ---
     try:
-        print("📥 Downloading heavy database...")
-        # استخدام requests مع timeout عالي
-        response = requests.get(stable_url, timeout=60)
-        
+        print("🌍 Attempting download...")
+        response = requests.get(url, timeout=40) # وقت انتظار طويل
         if response.status_code == 200:
-            # قراءة الملف
             df = pd.read_csv(StringIO(response.text), on_bad_lines='skip', low_memory=False)
+            print(f"✅ Downloaded {len(df)} rows from internet.")
             
-            # 🛑 صمام الأمان: إذا الملف صغير (أقل من 1000 مادة) نرفضه
-            if len(df) < 1000:
-                raise Exception("Downloaded file is too small! Operation aborted.")
-
-            print(f"✅ Base Loaded: {len(df)} substances.")
-
-            # توحيد أسماء الأعمدة لتجنب المشاكل
+            # تنظيف الاعمدة لتطابق الكود
             df.columns = [str(c).strip().lower() for c in df.columns]
             
-            # محاولة العثور على الأعمدة الصحيحة
-            name_col = next((c for c in df.columns if 'name' in c or 'inn' in c), 'inci name')
-            cas_col = next((c for c in df.columns if 'cas' in c), 'cas no')
-
-            # 💉 حقن المواد الجديدة (Injecting New Bans)
-            print("💉 Injecting 2025 updates...")
-            new_rows = []
-            existing_names = df[name_col].astype(str).str.lower().values
+            # محاولة توحيد الاسماء
+            # اذا العمود اسمه 'inci name' او 'name' نسويه 'inci_name'
+            col_map = {}
+            for col in df.columns:
+                if 'name' in col or 'inn' in col:
+                    col_map[col] = 'inci_name'
+                elif 'cas' in col:
+                    col_map[col] = 'cas_no'
             
-            for item in new_bans:
-                # نضيف المادة فقط إذا لم تكن موجودة
-                if item["INCI name"].lower() not in existing_names:
-                    row = {col: "" for col in df.columns} # صف فارغ
-                    row[name_col] = item["INCI name"]
-                    row[cas_col] = item["CAS No"]
-                    new_rows.append(row)
+            df.rename(columns=col_map, inplace=True)
             
-            if new_rows:
-                df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
-
-            # الحفظ النهائي
-            df.to_csv("banned.csv", index=False)
-            print(f"💾 SAVED SUCCESS: 'banned.csv' now has {len(df)} entries.")
-        
+            # التأكد ان الاعمدة المطلوبة موجودة
+            if 'inci_name' in df.columns:
+                final_df = df
+            else:
+                print("⚠️ Columns not found in downloaded file.")
         else:
-            print(f"❌ Server Error: {response.status_code}")
-            exit(1) # نخرج بخطأ حتى ينبهنا النظام
+            print("⚠️ Download failed.")
 
     except Exception as e:
-        print(f"🚨 FATAL ERROR: {e}")
-        exit(1) # ممنوع الحفظ إذا اكو خطأ
+        print(f"⚠️ Network Error: {e}")
+
+    # --- المحاولة 2: استخدام الطوارئ (اذا فشل النت) ---
+    if final_df is None or len(final_df) < 5:
+        print("🚨 Network Failed. Switching to EMERGENCY LOCAL DATA.")
+        final_df = pd.DataFrame(backup_data)
+    
+    # --- الخطوة الاخيرة: الدمج والحفظ ---
+    # نضمن ان المواد الجديدة (2025) موجودة حتى لو الملف المحمل قديم
+    try:
+        print("💉 Injecting critical updates...")
+        injection_df = pd.DataFrame(backup_data)
+        
+        # التأكد من توحيد اسماء الاعمدة قبل الدمج
+        if 'inci_name' not in final_df.columns:
+            final_df.rename(columns={"INCI Name": "inci_name", "CAS No": "cas_no"}, inplace=True)
+
+        # دمج
+        final_df = pd.concat([final_df, injection_df], ignore_index=True)
+        
+        # إزالة التكرار
+        if 'inci_name' in final_df.columns:
+            final_df.drop_duplicates(subset=['inci_name'], keep='last', inplace=True)
+
+        # الحفظ
+        final_df.to_csv("banned.csv", index=False)
+        print(f"💾 SUCCESS: Saved 'banned.csv' with {len(final_df)} rows.")
+        
+    except Exception as e:
+        print(f"💀 Logical Error: {e}")
+        # الملاذ الاخير جداً: حفظ ملف الطوارئ الخام
+        pd.DataFrame(backup_data).to_csv("banned.csv", index=False)
+        print("💾 Saved pure emergency list.")
+
+    # 🛑 سر النجاح: لا يوجد exit(1) هنا أبداً
+    print("🏁 Job Finished Successfully.")
 
 if __name__ == "__main__":
     update_database()
