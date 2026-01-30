@@ -1,13 +1,10 @@
 {
-  "name": "browser-bot",
+  "name": "simple-downloader",
   "version": "1.0.0",
-  "main": "browser_bot.js",
   "scripts": {
-    "start": "node browser_bot.js"
+    "start": "node updater.js"
   },
   "dependencies": {
-    "playwright": "^1.40.0",
-    "xlsx": "^0.18.5",
-    "objects-to-csv": "^1.3.6"
+    "axios": "^1.6.0"
   }
 }
